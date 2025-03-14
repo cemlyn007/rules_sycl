@@ -1,0 +1,8 @@
+cc_binary(
+    name = "main",
+    srcs = ["main.cpp"],
+    data = [
+        ":data.txt",
+        "@sycl//:hello.txt",
+    ],
+)

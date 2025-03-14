@@ -1,0 +1,10 @@
+"""A module docstring."""
+
+# load("repository.bzl", "http_archive")
+
+sycl_extension = use_extension("//sycl:extensions.bzl", "sycl_extension")
+use_repo(sycl_extension, "sycl")
+
+# http_archive = use_repo_rule("//sycl:repository.bzl", "http_archive")
+
+# http_archive(name = "hello-in-module", url = "hello", sha256 = "123")
