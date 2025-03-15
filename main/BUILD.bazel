@@ -3,6 +3,6 @@ cc_binary(
     srcs = ["main.cpp"],
     data = [
         ":data.txt",
-        "@sycl//:hello.txt",
+        # "@sycl//:hello.txt",
     ],
 )

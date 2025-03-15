@@ -1,11 +1,11 @@
 """This module provides extension-related functions for Bazel."""
 
-load("//sycl:repositories.bzl", "sycl_repository")
+load("//sycl:sycl_configure.bzl", "sycl_autoconf", "sycl_autoconf_toolchains")
 
-def _sycl_impl(ctx):
-    print("ctx.modules", ctx.modules)
-    sycl_repository(name = "sycl", url = "hellos", sha256 = "123")
+def _impl(ctx):
+    sycl_autoconf_toolchains(name = "local_config_sycl_toolchains")
+    sycl_autoconf(name = "local_config_sycl")
 
-sycl_extension = module_extension(
-    implementation = _sycl_impl,
+sycl_configure_extension = module_extension(
+    implementation = _impl,
 )

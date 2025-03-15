@@ -1,10 +1,15 @@
 """A module docstring."""
 
-# load("repository.bzl", "http_archive")
+module(
+    name = "rules_sycl",
+    version = "0.0.0",
+    compatibility_level = 1,
+)
 
-sycl_extension = use_extension("//sycl:extensions.bzl", "sycl_extension")
-use_repo(sycl_extension, "sycl")
+bazel_dep(name = "platforms", version = "0.0.11")
+bazel_dep(name = "rules_cc", version = "0.1.1")
 
-# http_archive = use_repo_rule("//sycl:repository.bzl", "http_archive")
-
-# http_archive(name = "hello-in-module", url = "hello", sha256 = "123")
+# ISSUED MANDATE: WE FOLLOW CC_RULES <3
+sycl_configure = use_extension("//sycl:extensions.bzl", "sycl_configure_extension")
+use_repo(sycl_configure, "local_config_sycl", "local_config_sycl_toolchains")
+register_toolchains("@local_config_sycl_toolchains//:all")
