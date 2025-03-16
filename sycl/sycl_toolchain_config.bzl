@@ -1,17 +1,4 @@
-# Copyright 2019 The Bazel Authors. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""A Starlark cc_toolchain configuration rule"""
+"""Configuration for the SYCL toolchain."""
 
 load(
     "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
@@ -199,6 +186,11 @@ def _no_canonical_prefixes_group(extra_flags):
 
 def _features(cpu, compiler, ctx):
     if cpu == "k8":
+        isystem_flags = []
+        for cxx_builtin_include_directory in ctx.attr.cxx_builtin_include_directories:
+            isystem_flags.append("-isystem")
+            isystem_flags.append(cxx_builtin_include_directory)
+
         return [
             feature(name = "no_legacy_features"),
             feature(
@@ -246,14 +238,7 @@ def _features(cpu, compiler, ctx):
                                 iterate_over = "system_include_paths",
                             ),
                             flag_group(
-                                flags = [
-                                    "-isystem",
-                                    "/opt/intel/oneapi/compiler/2025.0/include",
-                                    "-isystem",
-                                    "/opt/intel/oneapi/compiler/2025.0/include/sycl",
-                                ],
-                                # flags = ["-isystem", "%{system_include_paths}"],
-                                # iterate_over = ctx.attr.cxx_builtin_include_directories,
+                                flags = isystem_flags,
                             ),
                             _iterate_flag_group(
                                 flags = ["-F", "%{framework_include_paths}"],
@@ -541,11 +526,6 @@ def _impl(ctx):
     cpu = ctx.attr.cpu
     compiler = ctx.attr.compiler
 
-    # TODO: Why is my cpu value k8 and not local?
-    print("cpu value is " + cpu)
-    if cpu == "k8":
-        cpu = "k8"
-
     if (cpu == "k8"):
         target_cpu = "k8"
         target_libc = "k8"
@@ -566,33 +546,34 @@ def _impl(ctx):
         features = _features(cpu, compiler, ctx),
         cxx_builtin_include_directories = ctx.attr.cxx_builtin_include_directories,
         toolchain_identifier = ctx.attr.toolchain_identifier,
-        host_system_name = "local",
-        target_system_name = "local",
+        host_system_name = ctx.attr.host_system_name,
+        target_system_name = ctx.attr.target_system_name,
         target_cpu = target_cpu,
         target_libc = target_libc,
         compiler = compiler,
-        abi_version = "unknown",
-        abi_libc_version = "unknown",
+        abi_version = ctx.attr.abi_version,
+        abi_libc_version = ctx.attr.abi_libc_version,
         tool_paths = _tool_paths(cpu, ctx),
     )
 
 sycl_toolchain_config = rule(
     implementation = _impl,
     attrs = {
-        "cpu": attr.string(mandatory = True),
+        "cpu": attr.string(mandatory = True, values = ["k8"]),
         "compiler": attr.string(mandatory = True),
         "toolchain_identifier": attr.string(mandatory = True),
+        "host_system_name": attr.string(mandatory = True),
+        "target_system_name": attr.string(mandatory = True),
+        "target_libc": attr.string(mandatory = True),
+        "abi_version": attr.string(mandatory = True),
+        "abi_libc_version": attr.string(mandatory = True),
         "cxx_builtin_include_directories": attr.string_list(mandatory = True),
-        # TF HAVE:
-        # "cpu": attr.string(mandatory = True, values = ["local"]),
-        # "compiler": attr.string(values = ["clang", "unknown"], default = "unknown"),
         "extra_no_canonical_prefixes_flags": attr.string_list(),
         "host_compiler_path": attr.string(),
         "host_compiler_prefix": attr.string(),
         "host_compiler_warnings": attr.string_list(),
         "host_unfiltered_compile_flags": attr.string_list(),
         "linker_bin_path": attr.string(),
-        "builtin_sysroot": attr.string(),  # TODO: Looks unused??
     },
     provides = [CcToolchainConfigInfo],
 )

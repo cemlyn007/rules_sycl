@@ -369,11 +369,6 @@ def _select_sycl_lib_paths(repository_ctx, libs_paths, bash_bin):
         if selected_path == None:
             auto_configure_fail("Cannot find sycl library %s in %s" % (name, path))
 
-        # sycl_libs["sycl"].file_name = "libsycl.so.8"
-        # if selected_path.basename == "libsycl.so":
-        #     print("hit")
-        #     libs[name] = struct(file_name = "libsycl.so.8", path = realpath(repository_ctx, selected_path, bash_bin))
-        # else:
         libs[name] = struct(file_name = selected_path.basename, path = realpath(repository_ctx, selected_path, bash_bin))
 
     return libs
@@ -553,19 +548,19 @@ def sycl_autoconf_impl(repository_ctx):
     ))
 
     if sycl_config.sycl_basekit_version_number < "2024":
-        mkl_sycl_libs = '"{}"'.format(
-            "sycl/lib/" + sycl_libs["mkl_sycl"].file_name,
-        )
+        mkl_sycl_libs = to_list_of_strings(["sycl/lib/" + sycl_libs["mkl_sycl"].file_name])
     else:
-        mkl_sycl_libs = '"{}",\n"{}",\n"{}",\n"{}",\n"{}",\n"{}",\n"{}",\n"{}"'.format(
-            "sycl/lib/" + sycl_libs["mkl_sycl_blas"].file_name,
-            "sycl/lib/" + sycl_libs["mkl_sycl_lapack"].file_name,
-            "sycl/lib/" + sycl_libs["mkl_sycl_sparse"].file_name,
-            "sycl/lib/" + sycl_libs["mkl_sycl_dft"].file_name,
-            "sycl/lib/" + sycl_libs["mkl_sycl_vm"].file_name,
-            "sycl/lib/" + sycl_libs["mkl_sycl_rng"].file_name,
-            "sycl/lib/" + sycl_libs["mkl_sycl_stats"].file_name,
-            "sycl/lib/" + sycl_libs["mkl_sycl_data_fitting"].file_name,
+        mkl_sycl_libs = to_list_of_strings(
+            [
+                "sycl/lib/" + sycl_libs["mkl_sycl_blas"].file_name,
+                "sycl/lib/" + sycl_libs["mkl_sycl_lapack"].file_name,
+                "sycl/lib/" + sycl_libs["mkl_sycl_sparse"].file_name,
+                "sycl/lib/" + sycl_libs["mkl_sycl_dft"].file_name,
+                "sycl/lib/" + sycl_libs["mkl_sycl_vm"].file_name,
+                "sycl/lib/" + sycl_libs["mkl_sycl_rng"].file_name,
+                "sycl/lib/" + sycl_libs["mkl_sycl_stats"].file_name,
+                "sycl/lib/" + sycl_libs["mkl_sycl_data_fitting"].file_name,
+            ],
         )
     core_sycl_libs = to_list_of_strings([
         "sycl/lib/" + sycl_libs["sycl"].file_name,
@@ -602,20 +597,16 @@ def sycl_autoconf_impl(repository_ctx):
     sycl_internal_inc_dirs = find_sycl_include_path(repository_ctx = repository_ctx, sycl_config = sycl_config)
     cxx_builtin_includes_list = sycl_internal_inc_dirs + _sycl_include_path(repository_ctx, sycl_config, bash_bin) + host_compiler_includes
 
-    sycl_toolchain_identifier = "k8"
+    sycl_toolchain_identifier = get_cpu_value(repository_ctx)
+    host_system_name = "local"
+    target_system_name = "local"
+    target_libc = "local"
+    abi_version = "local"
+    abi_libc_version = "local"
     repository_ctx.template(
         "BUILD",
         paths["@rules_sycl//sycl:BUILD.tpl"],
-        # @unsorted-dict-items
         {
-            "%{sycl_toolchain_identifier}": sycl_toolchain_identifier,
-            "%{compiler}": escape_string(get_env_var(
-                repository_ctx,
-                "BAZEL_COMPILER",
-                _get_compiler_name(repository_ctx, cc),
-                False,
-            )),
-            "%{cxx_builtin_include_directories}": to_list_of_strings(cxx_builtin_includes_list),
             "%{name}": cpu_value,
             "%{target_cpu}": escape_string(get_env_var(
                 repository_ctx,
@@ -623,11 +614,22 @@ def sycl_autoconf_impl(repository_ctx):
                 cpu_value,
                 False,
             )),
-            # "%{extra_no_canonical_prefixes_flags}": to_list_of_strings(["-fno-canonical-system-headers"]),
-            "%{extra_no_canonical_prefixes_flags}": to_list_of_strings([]),
+            "%{compiler}": escape_string(get_env_var(
+                repository_ctx,
+                "BAZEL_COMPILER",
+                _get_compiler_name(repository_ctx, cc),
+                False,
+            )),
+            "%{sycl_toolchain_identifier}": sycl_toolchain_identifier,
+            "%{host_system_name}": host_system_name,
+            "%{target_system_name}": target_system_name,
+            "%{target_libc}": target_libc,
+            "%{abi_version}": abi_version,
+            "%{abi_libc_version}": abi_libc_version,
+            "%{cxx_builtin_include_directories}": to_list_of_strings(cxx_builtin_includes_list),
+            "%{extra_no_canonical_prefixes_flags}": to_list_of_strings([]),  # to_list_of_strings(["-fno-canonical-system-headers"]),
             "%{host_compiler_path}": "/opt/intel/oneapi/compiler/2025.0/bin/icpx",
             "%{host_compiler_prefix}": host_compiler_prefix,
-            # TODO: maybe name change it in build.tpl?
             "%{unfiltered_compile_flags}": to_list_of_strings([]),
             "%{linker_bin_path}": escape_string("/usr/bin"),
         },
