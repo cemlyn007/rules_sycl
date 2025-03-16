@@ -1,26 +1,26 @@
 # rules_sycl
 This repository contains a non-hermatic Bazel toolchain for using Intel OneAPI SYCL C++ for Linux x64_86. It also makes available the
-SYCL library via `"@local_config_sycl//sycl"`.
+SYCL library via `"@local_config_sycl//sycl"`. Note that you need to install Intel OneAPI and CUDA (if you want CUDA) in order to use this at the moment.
 
 ## Example
 
 I intend on this running out of the box, but you will need to install the Intel OneAPI manually to it's default location. Then you should be able to run this example:
 ```
-bazel run //example
+bazel run //example:cuda
 ```
 And if success should see:
 ```
 Running on NVIDIA GeForce RTX 4090
 Hello World! My ID is {0}
+Hello World! My ID is {5}
+Hello World! My ID is {7}
+Hello World! My ID is {6}
 Hello World! My ID is {1}
+Hello World! My ID is {9}
+Hello World! My ID is {8}
 Hello World! My ID is {2}
 Hello World! My ID is {3}
 Hello World! My ID is {4}
-Hello World! My ID is {5}
-Hello World! My ID is {6}
-Hello World! My ID is {7}
-Hello World! My ID is {8}
-Hello World! My ID is {9}
 ```
 
 ## Disclaimer

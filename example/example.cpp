@@ -1,4 +1,5 @@
 #include <sycl/sycl.hpp>
+
 int main(int argc, char *argv[]) {
   sycl::queue q;
   std::cout << "Running on "
