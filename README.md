@@ -1,1 +1,37 @@
-bazel mod deps
+# rules_sycl
+This repository contains a non-hermatic Bazel toolchain for using Intel OneAPI SYCL C++ for Linux x64_86. It also makes available the
+SYCL library via `"@local_config_sycl//sycl"`.
+
+## Example
+
+I intend on this running out of the box, but you will need to install the Intel OneAPI manually to it's default location. Then you should be able to run this example:
+```
+bazel run //example
+```
+And if success should see:
+```
+Running on NVIDIA GeForce RTX 4090
+Hello World! My ID is {0}
+Hello World! My ID is {1}
+Hello World! My ID is {2}
+Hello World! My ID is {3}
+Hello World! My ID is {4}
+Hello World! My ID is {5}
+Hello World! My ID is {6}
+Hello World! My ID is {7}
+Hello World! My ID is {8}
+Hello World! My ID is {9}
+```
+
+## Disclaimer
+1. Code has heavily been inspired and copied from TensorFlow and cc_rules, I take no credit for the authors who contributed to those Git repositories, and thank them very much!
+2. This is the classic it works on my machine, but I hope it works on yours as well! There are few things I have not ironned out,
+
+    a. I doubt I have configured this to offload to the CPU.
+    
+    b. I have only tested this on Bazel 8.1.1 with an NVIDIA GPU with CUDA 12.8 on Ubuntu Linux x64_86.
+
+    c. I currently have hardcoded the location of Intel OneAPI and the version to 2025.0.
+
+    d. Whilst intellisense is detecting all the files nicely, I am getting a couple of intellisense errors in the example script... :'(
+3. I am a Bazel noob, so if anyone notices anything obviously non-sensical, then please make a PR / contact me and we can address it.
