@@ -6,11 +6,119 @@ load(
     "files_exist",
     "get_host_environ",
     "raw_exec",
+    "read_dir",
+    "realpath",
     "which",
 )
 
 _GCC_HOST_COMPILER_PATH = "GCC_HOST_COMPILER_PATH"
+_GCC_HOST_COMPILER_PREFIX = "GCC_HOST_COMPILER_PREFIX"
 _INC_DIR_MARKER_BEGIN = "#include <...>"
+
+def _is_clang(repository_ctx, cc):
+    return "clang" in repository_ctx.execute([cc, "-v"]).stderr
+
+def _is_gcc(repository_ctx, cc):
+    # GCC's version output uses the basename of argv[0] as the program name:
+    # https://gcc.gnu.org/git/?p=gcc.git;a=blob;f=gcc/gcc.cc;h=158461167951c1b9540322fb19be6a89d6da07fc;hb=HEAD#l8728
+    cc_stdout = repository_ctx.execute([cc, "--version"]).stdout
+    return cc_stdout.startswith("gcc ") or cc_stdout.startswith("gcc-")
+
+def _get_compiler_name(repository_ctx, cc):
+    if _is_clang(repository_ctx, cc):
+        return "clang"
+    if _is_gcc(repository_ctx, cc):
+        return "gcc"
+    return "compiler"
+
+def escape_string(arg):
+    """Escape percent sign (%) in the string so it can appear in the Crosstool."""
+    if arg != None:
+        return str(arg).replace("%", "%%")
+    else:
+        return None
+
+def auto_configure_warning(msg):
+    """Output warning message during auto configuration."""
+    yellow = "\033[1;33m"
+    no_color = "\033[0m"
+
+    # buildifier: disable=print
+    print("\n%sAuto-Configuration Warning:%s %s\n" % (yellow, no_color, msg))
+
+def get_env_var(repository_ctx, name, default = None, enable_warning = True):
+    """Find an environment variable in system path. Doesn't %-escape the value!
+
+    Args:
+      repository_ctx: The repository context.
+      name: Name of the environment variable.
+      default: Default value to be used when such environment variable is not present.
+      enable_warning: Show warning if the variable is not present.
+    Returns:
+      value of the environment variable or default.
+    """
+
+    if name in repository_ctx.os.environ:
+        return repository_ctx.os.environ[name]
+    if default != None:
+        if enable_warning:
+            auto_configure_warning("'%s' environment variable is not set, using '%s' as default" % (name, default))
+        return default
+    auto_configure_fail("'%s' environment variable is not set" % name)
+    return None
+
+def _norm_path(path):
+    """Returns a path with '/' and remove the trailing slash."""
+    path = path.replace("\\", "/")
+    if path[-1] == "/":
+        path = path[:-1]
+    return path
+
+def make_copy_files_rule(repository_ctx, name, srcs, outs):
+    """Returns a rule to copy a set of files."""
+    cmds = []
+
+    # Copy files.
+    for src, out in zip(srcs, outs):
+        cmds.append('cp -f "%s" "$(location %s)"' % (src, out))
+    outs = [('        "%s",' % out) for out in outs]
+    return """genrule(
+    name = "%s",
+    outs = [
+%s
+    ],
+    cmd = \"""%s \""",
+)""" % (name, "\n".join(outs), " && \\\n".join(cmds))
+
+def make_copy_dir_rule(repository_ctx, name, src_dir, out_dir, exceptions = None):
+    """Returns a rule to recursively copy a directory.
+    If exceptions is not None, it must be a list of files or directories in
+    'src_dir'; these will be excluded from copying.
+    """
+    src_dir = _norm_path(src_dir)
+    out_dir = _norm_path(out_dir)
+    outs = read_dir(repository_ctx, src_dir)
+    post_cmd = ""
+    if exceptions != None:
+        outs = [x for x in outs if not any([
+            x.startswith(src_dir + "/" + y)
+            for y in exceptions
+        ])]
+    outs = [('        "%s",' % out.replace(src_dir, out_dir)) for out in outs]
+
+    # '@D' already contains the relative path for a single file, see
+    # http://docs.bazel.build/versions/master/be/make-variables.html#predefined_genrule_variables
+    out_dir = "$(@D)/%s" % out_dir if len(outs) > 1 else "$(@D)"
+    if exceptions != None:
+        for x in exceptions:
+            post_cmd += " ; rm -fR " + out_dir + "/" + x
+    return """genrule(
+    name = "%s",
+    outs = [
+%s
+    ],
+    cmd = \"""cp -rLf "%s/." "%s/" %s\""",
+)""" % (name, "\n".join(outs), src_dir, out_dir, post_cmd)
 
 def auto_configure_fail(msg):
     """Output failure message when auto configuration fails."""
@@ -215,6 +323,89 @@ def find_cc(repository_ctx):
               " environment variable").format(target_cc_name, cc_path_envvar))
     return cc
 
+def _sycl_lib_paths(repository_ctx, lib, basedir):
+    file_name = _lib_name(lib, version = "", static = False)
+    return [
+        repository_ctx.path("%s/lib/%s" % (basedir, file_name)),
+        repository_ctx.path("%s/lib/intel64/%s" % (basedir, file_name)),
+    ]
+
+def _batch_files_exist(repository_ctx, libs_paths, bash_bin):
+    all_paths = []
+    for _, lib_paths in libs_paths:
+        for lib_path in lib_paths:
+            all_paths.append(lib_path)
+    return files_exist(repository_ctx, all_paths, bash_bin)
+
+def _select_sycl_lib_paths(repository_ctx, libs_paths, bash_bin):
+    test_results = _batch_files_exist(repository_ctx, libs_paths, bash_bin)
+
+    libs = {}
+    i = 0
+    for name, lib_paths in libs_paths:
+        selected_path = None
+        for path in lib_paths:
+            if test_results[i] and selected_path == None:
+                # For each lib select the first path that exists.
+                selected_path = path
+            i = i + 1
+        if selected_path == None:
+            auto_configure_fail("Cannot find sycl library %s in %s" % (name, path))
+
+        libs[name] = struct(file_name = selected_path.basename, path = realpath(repository_ctx, selected_path, bash_bin))
+
+    return libs
+
+def _lib_name(lib, version = "", static = False):
+    """Constructs the name of a library on Linux.
+    Args:
+      lib: The name of the library, such as "mkl"
+      version: The version of the library.
+      static: True the library is static or False if it is a shared object.
+    Returns:
+      The platform-specific name of the library.
+    """
+    if static:
+        return "lib%s.a" % lib
+    else:
+        if version:
+            version = ".%s" % version
+        return "lib%s.so%s" % (lib, version)
+
+def _find_libs(repository_ctx, sycl_config, bash_bin):
+    """Returns the SYCL libraries on the system.
+    Args:
+      repository_ctx: The repository context.
+      sycl_config: The SYCL config as returned by _get_sycl_config
+      bash_bin: the path to the bash interpreter
+    Returns:
+      Map of library names to structs of filename and path
+    """
+    mkl_path = _mkl_path(sycl_config)
+    sycl_path = _sycl_header_path(repository_ctx, sycl_config, bash_bin)
+    libs_paths = [
+        (name, _sycl_lib_paths(repository_ctx, name, path))
+        for name, path in [
+            ("sycl", sycl_path),
+            ("OpenCL", sycl_path),
+            ("mkl_intel_ilp64", mkl_path),
+            ("mkl_sequential", mkl_path),
+            ("mkl_core", mkl_path),
+        ]
+    ]
+    if sycl_config.sycl_basekit_version_number < "2024":
+        libs_paths.append(("mkl_sycl", _sycl_lib_paths(repository_ctx, "mkl_sycl", mkl_path)))
+    else:
+        libs_paths.append(("mkl_sycl_blas", _sycl_lib_paths(repository_ctx, "mkl_sycl_blas", mkl_path)))
+        libs_paths.append(("mkl_sycl_lapack", _sycl_lib_paths(repository_ctx, "mkl_sycl_lapack", mkl_path)))
+        libs_paths.append(("mkl_sycl_sparse", _sycl_lib_paths(repository_ctx, "mkl_sycl_sparse", mkl_path)))
+        libs_paths.append(("mkl_sycl_dft", _sycl_lib_paths(repository_ctx, "mkl_sycl_dft", mkl_path)))
+        libs_paths.append(("mkl_sycl_vm", _sycl_lib_paths(repository_ctx, "mkl_sycl_vm", mkl_path)))
+        libs_paths.append(("mkl_sycl_rng", _sycl_lib_paths(repository_ctx, "mkl_sycl_rng", mkl_path)))
+        libs_paths.append(("mkl_sycl_stats", _sycl_lib_paths(repository_ctx, "mkl_sycl_stats", mkl_path)))
+        libs_paths.append(("mkl_sycl_data_fitting", _sycl_lib_paths(repository_ctx, "mkl_sycl_data_fitting", mkl_path)))
+    return _select_sycl_lib_paths(repository_ctx, libs_paths, bash_bin)
+
 def find_sycl_root(repository_ctx, sycl_config):
     sycl_name = str(repository_ctx.path(sycl_config.sycl_toolkit_path.strip()).realpath)
     if sycl_name.startswith("/"):
@@ -299,12 +490,42 @@ def sycl_autoconf_impl(repository_ctx):
         sycl_version_number = "80000",
     )
 
+    # Copy header and library files to execroot.
+    copy_rules = [
+        make_copy_dir_rule(
+            repository_ctx,
+            name = "sycl-include",
+            src_dir = _sycl_header_path(repository_ctx, sycl_config, bash_bin) + "/include",
+            out_dir = "sycl/include",
+        ),
+    ]
+    copy_rules.append(make_copy_dir_rule(
+        repository_ctx,
+        name = "mkl-include",
+        src_dir = _mkl_path(sycl_config) + "/include",
+        out_dir = "sycl/include",
+    ))
+
+    sycl_libs = _find_libs(repository_ctx, sycl_config, bash_bin)
+    sycl_lib_srcs = []
+    sycl_lib_outs = []
+    for lib in sycl_libs.values():
+        sycl_lib_srcs.append(lib.path)
+        sycl_lib_outs.append("sycl/lib/" + lib.file_name)
+    copy_rules.append(make_copy_files_rule(
+        repository_ctx,
+        name = "sycl-lib",
+        srcs = sycl_lib_srcs,
+        outs = sycl_lib_outs,
+    ))
+
     cc = find_cc(repository_ctx)
     host_compiler_includes = get_cxx_inc_directories(repository_ctx, cc)
+    host_compiler_prefix = get_host_environ(repository_ctx, _GCC_HOST_COMPILER_PREFIX, "/usr/bin")
     sycl_internal_inc_dirs = find_sycl_include_path(repository_ctx = repository_ctx, sycl_config = sycl_config)
     cxx_builtin_includes_list = sycl_internal_inc_dirs + _sycl_include_path(repository_ctx, sycl_config, bash_bin) + host_compiler_includes
 
-    sycl_toolchain_identifier = "local"
+    sycl_toolchain_identifier = "k8"
     repository_ctx.template(
         "BUILD",
         paths["@rules_sycl//sycl:BUILD.tpl"],
@@ -331,12 +552,12 @@ def sycl_autoconf_impl(repository_ctx):
             # )),
             "%{sycl_toolchain_identifier}": sycl_toolchain_identifier,
             # "%{compile_flags}": [],
-            # "%{compiler}": escape_string(get_env_var(
-            #     repository_ctx,
-            #     "BAZEL_COMPILER",
-            #     _get_compiler_name(repository_ctx, cc),
-            #     False,
-            # )),
+            "%{compiler}": escape_string(get_env_var(
+                repository_ctx,
+                "BAZEL_COMPILER",
+                _get_compiler_name(repository_ctx, cc),
+                False,
+            )),
             # "%{conly_flags}": get_starlark_list(conly_opts),
             # "%{coverage_compile_flags}": coverage_compile_flags,
             # "%{coverage_link_flags}": coverage_link_flags,
@@ -411,12 +632,12 @@ def sycl_autoconf_impl(repository_ctx):
             #     ),
             # ),
             # "%{supports_start_end_lib}": "True" if gold_or_lld_linker_path else "False",
-            # "%{target_cpu}": escape_string(get_env_var(
-            #     repository_ctx,
-            #     "BAZEL_TARGET_CPU",
-            #     cpu_value,
-            #     False,
-            # )),
+            "%{target_cpu}": escape_string(get_env_var(
+                repository_ctx,
+                "BAZEL_TARGET_CPU",
+                cpu_value,
+                False,
+            )),
             # "%{target_libc}": "macosx" if darwin else escape_string(get_env_var(
             #     repository_ctx,
             #     "BAZEL_TARGET_LIBC",
@@ -442,6 +663,19 @@ def sycl_autoconf_impl(repository_ctx):
             #         "-D__TIME__=\\\"redacted\\\"",
             #     ],
             # ),
+            # Google did this, looks like gcc argument, might not be clang argument allowed
+            # "%{extra_no_canonical_prefixes_flags}": to_list_of_strings(["-fno-canonical-system-headers"]),
+            "%{extra_no_canonical_prefixes_flags}": to_list_of_strings([]),
+            "%{host_compiler_path}": "/opt/intel/oneapi/compiler/2025.0/bin/icpx",
+            "%{host_compiler_prefix}": host_compiler_prefix,
+            # TODO: maybe name change it in build.tpl?
+            "%{unfiltered_compile_flags}": to_list_of_strings([
+                "-DTENSORFLOW_USE_SYCL=1",
+                "-DMKL_ILP64",
+                "-fPIC",
+            ]),
+            "%{linker_bin_path}": escape_string("/usr/bin"),
+            # "%{builtin_sysroot}": "",
         },
     )
 

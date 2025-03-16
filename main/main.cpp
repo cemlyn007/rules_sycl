@@ -1,5 +1,7 @@
 #include <filesystem>
 #include <iostream>
+// /opt/intel/oneapi/compiler/2025.0/include/sycl/sycl.hpp
+#include <sycl/sycl.hpp>
 
 int main() {
   std::cout << "Hello, World!" << std::endl;

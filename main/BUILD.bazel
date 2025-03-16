@@ -1,6 +1,7 @@
 cc_binary(
     name = "main",
     srcs = ["main.cpp"],
+    cxxopts = ["-fsycl"],
     data = [
         ":data.txt",
         # "@sycl//:hello.txt",

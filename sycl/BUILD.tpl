@@ -42,8 +42,8 @@ cc_toolchain(
 
 sycl_toolchain_config(
     name = "%{sycl_toolchain_identifier}",
-    # cpu = "%{target_cpu}",
-    # compiler = "%{compiler}",
+    cpu = "%{target_cpu}",
+    compiler = "%{compiler}",
     toolchain_identifier = "%{sycl_toolchain_identifier}",
     # host_system_name = "%{host_system_name}",
     # target_system_name = "%{target_system_name}",
@@ -65,4 +65,11 @@ sycl_toolchain_config(
     # coverage_link_flags = [%{coverage_link_flags}],
     # supports_start_end_lib = %{supports_start_end_lib},
     # extra_flags_per_feature = %{extra_flags_per_feature},
+    extra_no_canonical_prefixes_flags = [%{extra_no_canonical_prefixes_flags}],
+    host_compiler_path = "%{host_compiler_path}",
+    host_compiler_prefix = "%{host_compiler_prefix}",
+    # host_compiler_warnings = "%{host_compiler_warnings}",
+    host_unfiltered_compile_flags = [%{unfiltered_compile_flags}],
+    linker_bin_path = "%{linker_bin_path}",
+    # builtin_sysroot = %{builtin_sysroot},
 )
