@@ -1,0 +1,4 @@
+cc_test(
+    name = "test_compile_c_without_sycl",
+    srcs = ["test_compile_with_sycl.c"],
+)

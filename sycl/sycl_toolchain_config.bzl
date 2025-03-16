@@ -55,7 +55,6 @@ def all_cpp_compile_actions():
 
 def all_preprocessed_actions():
     return [
-        ACTION_NAMES.c_compile,
         ACTION_NAMES.cpp_compile,
         ACTION_NAMES.cpp_header_parsing,
         ACTION_NAMES.cpp_module_codegen,
@@ -506,7 +505,7 @@ def _action_configs(assembly_path, c_compiler_path, cc_compiler_path, archiver_p
 def _tool_paths(cpu, ctx):
     if cpu == "k8":
         return [
-            tool_path(name = "gcc", path = ctx.attr.host_compiler_path),
+            tool_path(name = "gcc", path = ctx.attr.host_cc_compiler_path),
             tool_path(name = "ar", path = ctx.attr.host_compiler_prefix + "/ar"),
             tool_path(name = "compat-ld", path = ctx.attr.host_compiler_prefix + "/ld"),
             tool_path(name = "cpp", path = ctx.attr.host_compiler_prefix + "/cpp"),
@@ -529,11 +528,11 @@ def _impl(ctx):
         target_cpu = "k8"
         target_libc = "k8"
         action_configs = _action_configs(
-            assembly_path = ctx.attr.host_compiler_path,
-            c_compiler_path = ctx.attr.host_compiler_path,
-            cc_compiler_path = ctx.attr.host_compiler_path,
+            assembly_path = ctx.attr.host_cc_compiler_path,
+            c_compiler_path = ctx.attr.host_c_compiler_path,
+            cc_compiler_path = ctx.attr.host_cc_compiler_path,
             archiver_path = ctx.attr.host_compiler_prefix + "/ar",
-            linker_path = ctx.attr.host_compiler_path,
+            linker_path = ctx.attr.host_cc_compiler_path,
             strip_path = ctx.attr.host_compiler_prefix + "/strip",
         )
     else:
@@ -568,7 +567,8 @@ sycl_toolchain_config = rule(
         "abi_libc_version": attr.string(mandatory = True),
         "cxx_builtin_include_directories": attr.string_list(mandatory = True),
         "extra_no_canonical_prefixes_flags": attr.string_list(),
-        "host_compiler_path": attr.string(),
+        "host_c_compiler_path": attr.string(mandatory = True),
+        "host_cc_compiler_path": attr.string(mandatory = True),
         "host_compiler_prefix": attr.string(),
         "host_compiler_warnings": attr.string_list(),
         "host_unfiltered_compile_flags": attr.string_list(),

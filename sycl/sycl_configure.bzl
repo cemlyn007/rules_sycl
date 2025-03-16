@@ -409,6 +409,7 @@ def _find_libs(repository_ctx, sycl_config, bash_bin):
         for name, path, version in [
             ("sycl", sycl_path, "8"),
             ("OpenCL", sycl_path, "1"),
+            ("ur_adapter_cuda", sycl_path, "0"),
             ("svml", oneapi_version_path, ""),
             ("irng", oneapi_version_path, ""),
             ("imf", oneapi_version_path, ""),
@@ -565,6 +566,7 @@ def sycl_autoconf_impl(repository_ctx):
     core_sycl_libs = to_list_of_strings([
         "sycl/lib/" + sycl_libs["sycl"].file_name,
         "sycl/lib/" + sycl_libs["OpenCL"].file_name,
+        "sycl/lib/" + sycl_libs["ur_adapter_cuda"].file_name,
         "sycl/lib/" + sycl_libs["svml"].file_name,
         "sycl/lib/" + sycl_libs["irng"].file_name,
         "sycl/lib/" + sycl_libs["imf"].file_name,
@@ -592,6 +594,8 @@ def sycl_autoconf_impl(repository_ctx):
     )
 
     cc = find_cc(repository_ctx)
+    host_c_compiler_path = get_host_environ(repository_ctx, _GCC_HOST_COMPILER_PATH, "/usr/bin/gcc")
+    host_cc_compiler_path = sycl_config.sycl_basekit_path + "/compiler/" + sycl_config.sycl_basekit_version_number + "/bin/icpx"
     host_compiler_includes = get_cxx_inc_directories(repository_ctx, cc)
     host_compiler_prefix = get_host_environ(repository_ctx, _GCC_HOST_COMPILER_PREFIX, "/usr/bin")
     sycl_internal_inc_dirs = find_sycl_include_path(repository_ctx = repository_ctx, sycl_config = sycl_config)
@@ -628,7 +632,8 @@ def sycl_autoconf_impl(repository_ctx):
             "%{abi_libc_version}": abi_libc_version,
             "%{cxx_builtin_include_directories}": to_list_of_strings(cxx_builtin_includes_list),
             "%{extra_no_canonical_prefixes_flags}": to_list_of_strings([]),  # to_list_of_strings(["-fno-canonical-system-headers"]),
-            "%{host_compiler_path}": "/opt/intel/oneapi/compiler/2025.0/bin/icpx",
+            "%{host_c_compiler_path}": host_c_compiler_path,
+            "%{host_cc_compiler_path}": host_cc_compiler_path,
             "%{host_compiler_prefix}": host_compiler_prefix,
             "%{unfiltered_compile_flags}": to_list_of_strings([]),
             "%{linker_bin_path}": escape_string("/usr/bin"),

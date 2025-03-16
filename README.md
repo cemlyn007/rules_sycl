@@ -22,7 +22,7 @@ Hello World! My ID is {2}
 Hello World! My ID is {3}
 Hello World! My ID is {4}
 ```
-Feel free to try `ONEAPI_DEVICE_SELECTOR="opencl:cpu"` instead, it did work for me.
+Feel free to try `ONEAPI_DEVICE_SELECTOR="opencl:cpu"` instead, it did work for me but note you might need to set `LD_LIBRARY_PATH="/opt/intel/oneapi/2025.0/lib"` to stop the binary from trying to use `/usr/local/cuda/targets/x86_64-linux/lib/libOpenCL.so.1`, this is something I am working on addressing.
 
 ## Disclaimer
 1. Code has heavily been inspired and copied from TensorFlow and cc_rules, I take no credit for the authors who contributed to those Git repositories, and thank them very much!
