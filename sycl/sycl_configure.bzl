@@ -74,8 +74,17 @@ def _norm_path(path):
         path = path[:-1]
     return path
 
-def make_copy_files_rule(repository_ctx, name, srcs, outs):
-    """Returns a rule to copy a set of files."""
+def make_copy_files_rule(name, srcs, outs):
+    """Returns a rule to copy a set of files.
+
+    Args:
+      name: The name of the rule.
+      srcs: The source files to copy.
+      outs: The destination files.
+
+    Returns:
+      A string containing the genrule definition.
+    """
     cmds = []
 
     # Copy files.
@@ -92,8 +101,16 @@ def make_copy_files_rule(repository_ctx, name, srcs, outs):
 
 def make_copy_dir_rule(repository_ctx, name, src_dir, out_dir, exceptions = None):
     """Returns a rule to recursively copy a directory.
-    If exceptions is not None, it must be a list of files or directories in
-    'src_dir'; these will be excluded from copying.
+
+    Args:
+      repository_ctx: The repository context.
+      name: The name of the rule.
+      src_dir: The source directory to copy.
+      out_dir: The destination directory.
+      exceptions: A list of files or directories to exclude from copying.
+
+    Returns:
+      A string containing the genrule definition.
     """
     src_dir = _norm_path(src_dir)
     out_dir = _norm_path(out_dir)
@@ -343,7 +360,6 @@ def _select_sycl_lib_paths(repository_ctx, libs_paths, bash_bin):
     libs = {}
     i = 0
     for name, lib_paths in libs_paths:
-        print(name, lib_paths)
         selected_path = None
         for path in lib_paths:
             if test_results[i] and selected_path == None:
@@ -379,12 +395,6 @@ def _lib_name(lib, version = "", static = False):
             version = ".%s" % version
         return "lib%s.so%s" % (lib, version)
 
-# /usr/bin/ld: warning: libsvml.so, needed by bazel-out/k8-fastbuild/bin/_solib_k8/_U_A_A+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_S_Ssycl_Csycl___Uexternal_S+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_Ssycl_Ssycl_Slib/libOpenCL.so, not found (try using -rpath or -rpath-link)
-# /usr/bin/ld: warning: libirng.so, needed by bazel-out/k8-fastbuild/bin/_solib_k8/_U_A_A+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_S_Ssycl_Csycl___Uexternal_S+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_Ssycl_Ssycl_Slib/libOpenCL.so, not found (try using -rpath or -rpath-link)
-# /usr/bin/ld: warning: libimf.so, needed by bazel-out/k8-fastbuild/bin/_solib_k8/_U_A_A+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_S_Ssycl_Csycl___Uexternal_S+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_Ssycl_Ssycl_Slib/libOpenCL.so, not found (try using -rpath or -rpath-link)
-# /usr/bin/ld: warning: libintlc.so.5, needed by bazel-out/k8-fastbuild/bin/_solib_k8/_U_A_A+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_S_Ssycl_Csycl___Uexternal_S+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_Ssycl_Ssycl_Slib/libOpenCL.so, not found (try using -rpath or -rpath-link)
-# /usr/bin/ld: warning: libumf.so.0, needed by /opt/intel/oneapi/compiler/2025.0/bin/compiler/../../lib/libur_adapter_opencl.so, not found (try using -rpath or -rpath-link)
-
 def _find_libs(repository_ctx, sycl_config, bash_bin):
     """Finds the SYCL libraries on the system.
 
@@ -397,13 +407,8 @@ def _find_libs(repository_ctx, sycl_config, bash_bin):
     """
     mkl_path = _mkl_path(sycl_config)
     sycl_path = _sycl_header_path(repository_ctx, sycl_config, bash_bin)
-    print(mkl_path)
-    print(sycl_path)  # /opt/intel/oneapi
-    print(sycl_config.sycl_basekit_path + "/" + sycl_config.sycl_basekit_version_number + "/lib")
-
     oneapi_version_path = sycl_config.sycl_basekit_path + "/" + sycl_config.sycl_basekit_version_number
 
-    # oneapi/2025.0/lib/libumf.so
     libs_paths = [
         (name, _sycl_lib_paths(repository_ctx, name, path, version))
         for name, path, version in [
@@ -415,8 +420,6 @@ def _find_libs(repository_ctx, sycl_config, bash_bin):
             ("intlc", oneapi_version_path, "5"),
             ("umf", oneapi_version_path, "0"),
             ("hwloc", oneapi_version_path, "15"),
-            # ur_loader
-            # ur_adapter_opencl
             ("ur_loader", oneapi_version_path, "0"),
             ("ur_adapter_opencl", oneapi_version_path, "0"),
             ("mkl_intel_ilp64", mkl_path, ""),
@@ -504,7 +507,6 @@ def sycl_autoconf_impl(repository_ctx):
     paths = resolve_labels(repository_ctx, [
         "@rules_sycl//sycl:BUILD.tpl",
         "@rules_sycl//sycl/sycl:BUILD.tpl",
-        # "@rules_cc//cc/private/toolchain:generate_system_module_map.sh",
         "@rules_sycl//sycl:sycl_toolchain_config.bzl",
     ])
 
@@ -539,14 +541,12 @@ def sycl_autoconf_impl(repository_ctx):
     ))
 
     sycl_libs = _find_libs(repository_ctx, sycl_config, bash_bin)
-    print("CEMLYN: ", sycl_libs)
     sycl_lib_srcs = []
     sycl_lib_outs = []
     for lib in sycl_libs.values():
         sycl_lib_srcs.append(lib.path)
         sycl_lib_outs.append("sycl/lib/" + lib.file_name)
     copy_rules.append(make_copy_files_rule(
-        repository_ctx,
         name = "sycl-lib",
         srcs = sycl_lib_srcs,
         outs = sycl_lib_outs,
@@ -568,16 +568,16 @@ def sycl_autoconf_impl(repository_ctx):
             "sycl/lib/" + sycl_libs["mkl_sycl_data_fitting"].file_name,
         )
     core_sycl_libs = to_list_of_strings([
-        "sycl/lib/" + sycl_libs["sycl"].file_name,  # .split(".so")[0],
-        "sycl/lib/" + sycl_libs["OpenCL"].file_name,  # .split(".so")[0],
-        "sycl/lib/" + sycl_libs["svml"].file_name,  # .split(".so")[0],
-        "sycl/lib/" + sycl_libs["irng"].file_name,  # .split(".so")[0],
-        "sycl/lib/" + sycl_libs["imf"].file_name,  # .split(".so")[0],
-        "sycl/lib/" + sycl_libs["intlc"].file_name,  # .split(".so")[0],
-        "sycl/lib/" + sycl_libs["umf"].file_name,  # .split(".so")[0],
-        "sycl/lib/" + sycl_libs["hwloc"].file_name,  # .split(".so")[0],
-        "sycl/lib/" + sycl_libs["ur_loader"].file_name,  # .split(".so")[0],
-        "sycl/lib/" + sycl_libs["ur_adapter_opencl"].file_name,  # .split(".so")[0],
+        "sycl/lib/" + sycl_libs["sycl"].file_name,
+        "sycl/lib/" + sycl_libs["OpenCL"].file_name,
+        "sycl/lib/" + sycl_libs["svml"].file_name,
+        "sycl/lib/" + sycl_libs["irng"].file_name,
+        "sycl/lib/" + sycl_libs["imf"].file_name,
+        "sycl/lib/" + sycl_libs["intlc"].file_name,
+        "sycl/lib/" + sycl_libs["umf"].file_name,
+        "sycl/lib/" + sycl_libs["hwloc"].file_name,
+        "sycl/lib/" + sycl_libs["ur_loader"].file_name,
+        "sycl/lib/" + sycl_libs["ur_adapter_opencl"].file_name,
     ])
     repository_dict = {
         "%{mkl_intel_ilp64_lib}": sycl_libs["mkl_intel_ilp64"].file_name,
@@ -608,151 +608,28 @@ def sycl_autoconf_impl(repository_ctx):
         paths["@rules_sycl//sycl:BUILD.tpl"],
         # @unsorted-dict-items
         {
-            # "%{abi_libc_version}": escape_string(get_env_var(
-            #     repository_ctx,
-            #     "ABI_LIBC_VERSION",
-            #     "local",
-            #     False,
-            # )),
-            # "%{abi_version}": escape_string(get_env_var(
-            #     repository_ctx,
-            #     "ABI_VERSION",
-            #     "local",
-            #     False,
-            # )),
-            # "%{cc_compiler_deps}": get_starlark_list([
-            #     ":builtin_include_directory_paths",
-            #     ":cc_wrapper",
-            #     ":deps_scanner_wrapper",
-            # ] + (
-            #     [":validate_static_library"] if "validate_static_library" in tool_paths else []
-            # )),
             "%{sycl_toolchain_identifier}": sycl_toolchain_identifier,
-            # "%{compile_flags}": [],
             "%{compiler}": escape_string(get_env_var(
                 repository_ctx,
                 "BAZEL_COMPILER",
                 _get_compiler_name(repository_ctx, cc),
                 False,
             )),
-            # "%{conly_flags}": get_starlark_list(conly_opts),
-            # "%{coverage_compile_flags}": coverage_compile_flags,
-            # "%{coverage_link_flags}": coverage_link_flags,
             "%{cxx_builtin_include_directories}": to_list_of_strings(cxx_builtin_includes_list),
-            # "%{cxx_flags}": get_starlark_list(cxx_opts + _escaped_cplus_include_paths(repository_ctx)),
-            # "%{dbg_compile_flags}": get_starlark_list(["-g"]),
-            # "%{extra_flags_per_feature}": repr(extra_flags_per_feature),
-            # "%{host_system_name}": escape_string(get_env_var(
-            #     repository_ctx,
-            #     "BAZEL_HOST_SYSTEM",
-            #     "local",
-            #     False,
-            # )),
-            # "%{link_flags}": get_starlark_list(force_linker_flags + (
-            #     ["-Wl,-no-as-needed"] if is_as_needed_supported else []
-            # ) + _add_linker_option_if_supported(
-            #     repository_ctx,
-            #     cc,
-            #     force_linker_flags,
-            #     "-Wl,-z,relro,-z,now",
-            #     "-z",
-            # ) + (
-            #     [
-            #         "-headerpad_max_install_names",
-            #     ] if darwin else [
-            #         # Gold linker only? Can we enable this by default?
-            #         # "-Wl,--warn-execstack",
-            #         # "-Wl,--detect-odr-violations"
-            #     ] + _add_compiler_option_if_supported(
-            #         # Have gcc return the exit code from ld.
-            #         repository_ctx,
-            #         cc,
-            #         "-pass-exit-codes",
-            #     )
-            # ) + link_opts),
-            # "%{link_libs}": get_starlark_list(link_libs),
-            # "%{modulemap}": ("\":module.modulemap\"" if generate_modulemap else "None"),
             "%{name}": cpu_value,
-            # "%{opt_compile_flags}": get_starlark_list(
-            #     [
-            #         # No debug symbols.
-            #         # Maybe we should enable https://gcc.gnu.org/wiki/DebugFission for opt or
-            #         # even generally? However, that can't happen here, as it requires special
-            #         # handling in Bazel.
-            #         "-g0",
-
-            #         # Conservative choice for -O
-            #         # -O3 can increase binary size and even slow down the resulting binaries.
-            #         # Profile first and / or use FDO if you need better performance than this.
-            #         "-O2",
-
-            #         # Security hardening on by default.
-            #         # Conservative choice; -D_FORTIFY_SOURCE=2 may be unsafe in some cases.
-            #         "-D_FORTIFY_SOURCE=1",
-
-            #         # Disable assertions
-            #         "-DNDEBUG",
-
-            #         # Removal of unused code and data at link time (can this increase binary
-            #         # size in some cases?).
-            #         "-ffunction-sections",
-            #         "-fdata-sections",
-            #     ],
-            # ),
-            # "%{opt_link_flags}": get_starlark_list(
-            #     ["-Wl,-dead_strip"] if darwin else _add_linker_option_if_supported(
-            #         repository_ctx,
-            #         cc,
-            #         force_linker_flags,
-            #         "-Wl,--gc-sections",
-            #         "-gc-sections",
-            #     ),
-            # ),
-            # "%{supports_start_end_lib}": "True" if gold_or_lld_linker_path else "False",
             "%{target_cpu}": escape_string(get_env_var(
                 repository_ctx,
                 "BAZEL_TARGET_CPU",
                 cpu_value,
                 False,
             )),
-            # "%{target_libc}": "macosx" if darwin else escape_string(get_env_var(
-            #     repository_ctx,
-            #     "BAZEL_TARGET_LIBC",
-            #     "local",
-            #     False,
-            # )),
-            # "%{target_system_name}": escape_string(get_env_var(
-            #     repository_ctx,
-            #     "BAZEL_TARGET_SYSTEM",
-            #     "local",
-            #     False,
-            # )),
-            # "%{tool_paths}": ",\n        ".join(
-            #     ['"%s": "%s"' % (k, v) for k, v in tool_paths.items() if v != None],
-            # ),
-            # "%{unfiltered_compile_flags}": get_starlark_list(
-            #     _get_no_canonical_prefixes_opt(repository_ctx, cc) + [
-            #         # Make C++ compilation deterministic. Use linkstamping instead of these
-            #         # compiler symbols.
-            #         "-Wno-builtin-macro-redefined",
-            #         "-D__DATE__=\\\"redacted\\\"",
-            #         "-D__TIMESTAMP__=\\\"redacted\\\"",
-            #         "-D__TIME__=\\\"redacted\\\"",
-            #     ],
-            # ),
-            # Google did this, looks like gcc argument, might not be clang argument allowed
             # "%{extra_no_canonical_prefixes_flags}": to_list_of_strings(["-fno-canonical-system-headers"]),
             "%{extra_no_canonical_prefixes_flags}": to_list_of_strings([]),
             "%{host_compiler_path}": "/opt/intel/oneapi/compiler/2025.0/bin/icpx",
             "%{host_compiler_prefix}": host_compiler_prefix,
             # TODO: maybe name change it in build.tpl?
-            "%{unfiltered_compile_flags}": to_list_of_strings([
-                "-DTENSORFLOW_USE_SYCL=1",
-                "-DMKL_ILP64",
-                # "-fPIC",
-            ]),
+            "%{unfiltered_compile_flags}": to_list_of_strings([]),
             "%{linker_bin_path}": escape_string("/usr/bin"),
-            # "%{builtin_sysroot}": "",
         },
     )
 

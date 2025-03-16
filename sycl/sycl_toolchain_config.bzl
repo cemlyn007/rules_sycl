@@ -16,11 +16,7 @@
 load(
     "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
     "action_config",
-    "artifact_name_pattern",
-    "env_entry",
-    "env_set",
     "feature",
-    "feature_set",
     "flag_group",
     "flag_set",
     "tool",
@@ -568,19 +564,15 @@ def _impl(ctx):
         ctx = ctx,
         action_configs = action_configs,
         features = _features(cpu, compiler, ctx),
-        # TODO: The next steps is to use a repository rule in a repository rule
-        #  to automatically get these include directories and inject them here.
-        #  We can get inspiration on how to do this from TensorFlow.
-        #  We also want to add them as -isystem flags so that intellisense can detect them.
         cxx_builtin_include_directories = ctx.attr.cxx_builtin_include_directories,
         toolchain_identifier = ctx.attr.toolchain_identifier,
-        # host_system_name = "k8",
-        # target_system_name = "k8",
+        host_system_name = "local",
+        target_system_name = "local",
         target_cpu = target_cpu,
         target_libc = target_libc,
         compiler = compiler,
-        # abi_version = "unknown",
-        # abi_libc_version = "unknown",
+        abi_version = "unknown",
+        abi_libc_version = "unknown",
         tool_paths = _tool_paths(cpu, ctx),
     )
 
@@ -592,9 +584,8 @@ sycl_toolchain_config = rule(
         "toolchain_identifier": attr.string(mandatory = True),
         "cxx_builtin_include_directories": attr.string_list(mandatory = True),
         # TF HAVE:
-        # "cpu": attr.string(mandatory = True, values = ["k8"]),
+        # "cpu": attr.string(mandatory = True, values = ["local"]),
         # "compiler": attr.string(values = ["clang", "unknown"], default = "unknown"),
-        # TODO: These values aren't hooked up in BUILD.tpl!
         "extra_no_canonical_prefixes_flags": attr.string_list(),
         "host_compiler_path": attr.string(),
         "host_compiler_prefix": attr.string(),

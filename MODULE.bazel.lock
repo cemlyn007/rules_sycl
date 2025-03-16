@@ -139,7 +139,7 @@
   "moduleExtensions": {
     "//sycl:extensions.bzl%sycl_configure_extension": {
       "general": {
-        "bzlTransitiveDigest": "8Au9AjFShEPvIpwo1Z+jM5fb1KCVHa/yjghaKNMyxkI=",
+        "bzlTransitiveDigest": "Yst7xgE2rNzU8VVbNDWYdbvsDq/pnTq/O57RuUVFKA8=",
         "usagesDigest": "jbA8yVPn3Xme5tOPjIGd4eM9w3a5xwjRPXptE6bLaoI=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
