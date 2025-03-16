@@ -286,14 +286,6 @@ def _features(cpu, compiler, ctx):
                                     "-D__TIME__=\"redacted\"",
                                 ],
                             ),
-                            # flag_group(
-                            #     flags = ["-fPIC"],
-                            #     expand_if_available = "pic",
-                            # ),
-                            # flag_group(
-                            #     flags = ["-fPIE"],
-                            #     expand_if_not_available = "pic",
-                            # ),
                             flag_group(
                                 flags = [
                                     "-U_FORTIFY_SOURCE",
@@ -461,10 +453,6 @@ def _features(cpu, compiler, ctx):
                             ),
                         ],
                     ),
-                    # flag_set(
-                    #     actions = all_executable_link_actions(),
-                    #     flag_groups = [flag_group(flags = ["-pie"])],
-                    # ),
                 ] + ([
                     flag_set(
                         actions = all_link_actions(),
@@ -499,8 +487,6 @@ def _features(cpu, compiler, ctx):
             feature(name = "fastbuild"),
             feature(name = "dbg"),
             feature(name = "supports_dynamic_linker", enabled = True),
-            feature(name = "pic", enabled = True),
-            feature(name = "supports_pic", enabled = True),
             feature(name = "has_configured_linker_path", enabled = True),
         ]
     else:
