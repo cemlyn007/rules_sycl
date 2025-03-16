@@ -7,7 +7,6 @@ module(
 )
 
 bazel_dep(name = "platforms", version = "0.0.11")
-bazel_dep(name = "rules_cc", version = "0.1.1")
 
 sycl_configure = use_extension("//sycl:extensions.bzl", "sycl_configure_extension")
 use_repo(sycl_configure, "local_config_sycl", "local_config_sycl_toolchains")

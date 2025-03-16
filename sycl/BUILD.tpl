@@ -1,6 +1,4 @@
 load(":sycl_toolchain_config.bzl", "sycl_toolchain_config")
-load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
-load("@rules_cc//cc/toolchains:cc_toolchain_suite.bzl", "cc_toolchain_suite")
 
 package(default_visibility = ["//visibility:public"])
 

@@ -1,5 +1,6 @@
 """Configuration for the SYCL toolchain."""
 
+load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load(
     "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
     "action_config",
@@ -11,8 +12,6 @@ load(
     "variable_with_value",
     "with_feature_set",
 )
-load("@rules_cc//cc:action_names.bzl", "ACTION_NAMES")
-load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 
 def _iterate_flag_group(iterate_over, flags = [], flag_groups = []):
     return flag_group(
