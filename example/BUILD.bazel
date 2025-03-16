@@ -8,7 +8,6 @@ CPU_FLAGS = [
 
 CUDA_FLAGS = [
     "-fsycl-targets=nvptx64-nvidia-cuda",
-    "--offload-arch=sm_80",
 ]
 
 cc_binary(
@@ -23,6 +22,6 @@ cc_binary(
     name = "cuda",
     srcs = ["example.cpp"],
     cxxopts = CORE_FLAGS + CUDA_FLAGS,
-    linkopts = CORE_FLAGS + CUDA_FLAGS,
+    linkopts = CORE_FLAGS + CUDA_FLAGS + ["--offload-arch=sm_80"],
     deps = ["@local_config_sycl//sycl"],
 )
