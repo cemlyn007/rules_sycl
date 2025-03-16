@@ -32,16 +32,6 @@ cc_library(
         ".",
         "sycl/include",
     ],
-    # linkopts = [
-    #     # "-static",
-    #     "-lur_loader",
-    #     "-lur_adapter_opencl",
-    #     "-lsvml",
-    #     "-lirng",
-    #     "-limf",
-    #     "-lintlc",
-    #     "-lumf",
-    # ],
     linkstatic = 1,
     visibility = ["//visibility:public"],
 )

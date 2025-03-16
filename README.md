@@ -6,7 +6,7 @@ SYCL library via `"@local_config_sycl//sycl"`. Note that you need to install Int
 
 I intend on this running out of the box, but you will need to install the Intel OneAPI manually to it's default location. Then you should be able to run this example:
 ```
-bazel run //example:cuda
+ONEAPI_DEVICE_SELECTOR="cuda:gpu" SYCL_UR_TRACE=1 bazel run //example:cpu_or_cuda
 ```
 And if success should see:
 ```
@@ -22,6 +22,7 @@ Hello World! My ID is {2}
 Hello World! My ID is {3}
 Hello World! My ID is {4}
 ```
+Feel free to try `ONEAPI_DEVICE_SELECTOR="opencl:cpu"` instead, it did work for me.
 
 ## Disclaimer
 1. Code has heavily been inspired and copied from TensorFlow and cc_rules, I take no credit for the authors who contributed to those Git repositories, and thank them very much!

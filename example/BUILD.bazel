@@ -10,6 +10,10 @@ CUDA_FLAGS = [
     "-fsycl-targets=nvptx64-nvidia-cuda",
 ]
 
+CPU_AND_CUDA_FLAGS = [
+    "-fsycl-targets=spir64,nvptx64-nvidia-cuda",
+]
+
 cc_binary(
     name = "cpu",
     srcs = ["example.cpp"],
@@ -23,5 +27,13 @@ cc_binary(
     srcs = ["example.cpp"],
     cxxopts = CORE_FLAGS + CUDA_FLAGS,
     linkopts = CORE_FLAGS + CUDA_FLAGS + ["--offload-arch=sm_80"],
+    deps = ["@local_config_sycl//sycl"],
+)
+
+cc_binary(
+    name = "cpu_or_cuda",
+    srcs = ["example.cpp"],
+    cxxopts = CORE_FLAGS + CPU_AND_CUDA_FLAGS,
+    linkopts = CORE_FLAGS + CPU_AND_CUDA_FLAGS + ["--offload-arch=sm_80"],
     deps = ["@local_config_sycl//sycl"],
 )
