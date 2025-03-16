@@ -253,6 +253,8 @@ def _features(cpu, compiler, ctx):
                                 flags = [
                                     "-isystem",
                                     "/opt/intel/oneapi/compiler/2025.0/include",
+                                    "-isystem",
+                                    "/opt/intel/oneapi/compiler/2025.0/include/sycl",
                                 ],
                                 # flags = ["-isystem", "%{system_include_paths}"],
                                 # iterate_over = ctx.attr.cxx_builtin_include_directories,
@@ -284,14 +286,14 @@ def _features(cpu, compiler, ctx):
                                     "-D__TIME__=\"redacted\"",
                                 ],
                             ),
-                            flag_group(
-                                flags = ["-fPIC"],
-                                expand_if_available = "pic",
-                            ),
-                            flag_group(
-                                flags = ["-fPIE"],
-                                expand_if_not_available = "pic",
-                            ),
+                            # flag_group(
+                            #     flags = ["-fPIC"],
+                            #     expand_if_available = "pic",
+                            # ),
+                            # flag_group(
+                            #     flags = ["-fPIE"],
+                            #     expand_if_not_available = "pic",
+                            # ),
                             flag_group(
                                 flags = [
                                     "-U_FORTIFY_SOURCE",
@@ -459,10 +461,10 @@ def _features(cpu, compiler, ctx):
                             ),
                         ],
                     ),
-                    flag_set(
-                        actions = all_executable_link_actions(),
-                        flag_groups = [flag_group(flags = ["-pie"])],
-                    ),
+                    # flag_set(
+                    #     actions = all_executable_link_actions(),
+                    #     flag_groups = [flag_group(flags = ["-pie"])],
+                    # ),
                 ] + ([
                     flag_set(
                         actions = all_link_actions(),

@@ -1,9 +1,19 @@
 cc_binary(
     name = "main",
     srcs = ["main.cpp"],
-    cxxopts = ["-fsycl"],
+    cxxopts = [
+        "-fsycl",
+        "-fsycl-targets=nvptx64-nvidia-cuda",
+        "--offload-arch=sm_80",
+    ],
     data = [
         ":data.txt",
         # "@sycl//:hello.txt",
     ],
+    linkopts = [
+        "-fsycl",
+        "-fsycl-targets=nvptx64-nvidia-cuda",
+        "--offload-arch=sm_80",
+    ],
+    deps = ["@local_config_sycl//sycl"],
 )

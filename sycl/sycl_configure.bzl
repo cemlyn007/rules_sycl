@@ -323,8 +323,8 @@ def find_cc(repository_ctx):
               " environment variable").format(target_cc_name, cc_path_envvar))
     return cc
 
-def _sycl_lib_paths(repository_ctx, lib, basedir):
-    file_name = _lib_name(lib, version = "", static = False)
+def _sycl_lib_paths(repository_ctx, lib, basedir, version = ""):
+    file_name = _lib_name(lib, version = version, static = False)
     return [
         repository_ctx.path("%s/lib/%s" % (basedir, file_name)),
         repository_ctx.path("%s/lib/intel64/%s" % (basedir, file_name)),
@@ -343,6 +343,7 @@ def _select_sycl_lib_paths(repository_ctx, libs_paths, bash_bin):
     libs = {}
     i = 0
     for name, lib_paths in libs_paths:
+        print(name, lib_paths)
         selected_path = None
         for path in lib_paths:
             if test_results[i] and selected_path == None:
@@ -352,12 +353,18 @@ def _select_sycl_lib_paths(repository_ctx, libs_paths, bash_bin):
         if selected_path == None:
             auto_configure_fail("Cannot find sycl library %s in %s" % (name, path))
 
+        # sycl_libs["sycl"].file_name = "libsycl.so.8"
+        # if selected_path.basename == "libsycl.so":
+        #     print("hit")
+        #     libs[name] = struct(file_name = "libsycl.so.8", path = realpath(repository_ctx, selected_path, bash_bin))
+        # else:
         libs[name] = struct(file_name = selected_path.basename, path = realpath(repository_ctx, selected_path, bash_bin))
 
     return libs
 
 def _lib_name(lib, version = "", static = False):
-    """Constructs the name of a library on Linux.
+    """Constructs the platform-specific name of a library.
+
     Args:
       lib: The name of the library, such as "mkl"
       version: The version of the library.
@@ -372,8 +379,15 @@ def _lib_name(lib, version = "", static = False):
             version = ".%s" % version
         return "lib%s.so%s" % (lib, version)
 
+# /usr/bin/ld: warning: libsvml.so, needed by bazel-out/k8-fastbuild/bin/_solib_k8/_U_A_A+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_S_Ssycl_Csycl___Uexternal_S+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_Ssycl_Ssycl_Slib/libOpenCL.so, not found (try using -rpath or -rpath-link)
+# /usr/bin/ld: warning: libirng.so, needed by bazel-out/k8-fastbuild/bin/_solib_k8/_U_A_A+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_S_Ssycl_Csycl___Uexternal_S+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_Ssycl_Ssycl_Slib/libOpenCL.so, not found (try using -rpath or -rpath-link)
+# /usr/bin/ld: warning: libimf.so, needed by bazel-out/k8-fastbuild/bin/_solib_k8/_U_A_A+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_S_Ssycl_Csycl___Uexternal_S+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_Ssycl_Ssycl_Slib/libOpenCL.so, not found (try using -rpath or -rpath-link)
+# /usr/bin/ld: warning: libintlc.so.5, needed by bazel-out/k8-fastbuild/bin/_solib_k8/_U_A_A+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_S_Ssycl_Csycl___Uexternal_S+sycl_Uconfigure_Uextension+local_Uconfig_Usycl_Ssycl_Ssycl_Slib/libOpenCL.so, not found (try using -rpath or -rpath-link)
+# /usr/bin/ld: warning: libumf.so.0, needed by /opt/intel/oneapi/compiler/2025.0/bin/compiler/../../lib/libur_adapter_opencl.so, not found (try using -rpath or -rpath-link)
+
 def _find_libs(repository_ctx, sycl_config, bash_bin):
-    """Returns the SYCL libraries on the system.
+    """Finds the SYCL libraries on the system.
+
     Args:
       repository_ctx: The repository context.
       sycl_config: The SYCL config as returned by _get_sycl_config
@@ -383,14 +397,31 @@ def _find_libs(repository_ctx, sycl_config, bash_bin):
     """
     mkl_path = _mkl_path(sycl_config)
     sycl_path = _sycl_header_path(repository_ctx, sycl_config, bash_bin)
+    print(mkl_path)
+    print(sycl_path)  # /opt/intel/oneapi
+    print(sycl_config.sycl_basekit_path + "/" + sycl_config.sycl_basekit_version_number + "/lib")
+
+    oneapi_version_path = sycl_config.sycl_basekit_path + "/" + sycl_config.sycl_basekit_version_number
+
+    # oneapi/2025.0/lib/libumf.so
     libs_paths = [
-        (name, _sycl_lib_paths(repository_ctx, name, path))
-        for name, path in [
-            ("sycl", sycl_path),
-            ("OpenCL", sycl_path),
-            ("mkl_intel_ilp64", mkl_path),
-            ("mkl_sequential", mkl_path),
-            ("mkl_core", mkl_path),
+        (name, _sycl_lib_paths(repository_ctx, name, path, version))
+        for name, path, version in [
+            ("sycl", sycl_path, "8"),
+            ("OpenCL", sycl_path, "1"),
+            ("svml", oneapi_version_path, ""),
+            ("irng", oneapi_version_path, ""),
+            ("imf", oneapi_version_path, ""),
+            ("intlc", oneapi_version_path, "5"),
+            ("umf", oneapi_version_path, "0"),
+            ("hwloc", oneapi_version_path, "15"),
+            # ur_loader
+            # ur_adapter_opencl
+            ("ur_loader", oneapi_version_path, "0"),
+            ("ur_adapter_opencl", oneapi_version_path, "0"),
+            ("mkl_intel_ilp64", mkl_path, ""),
+            ("mkl_sequential", mkl_path, ""),
+            ("mkl_core", mkl_path, ""),
         ]
     ]
     if sycl_config.sycl_basekit_version_number < "2024":
@@ -472,6 +503,7 @@ def sycl_autoconf_impl(repository_ctx):
     cpu_value = get_cpu_value(repository_ctx)
     paths = resolve_labels(repository_ctx, [
         "@rules_sycl//sycl:BUILD.tpl",
+        "@rules_sycl//sycl/sycl:BUILD.tpl",
         # "@rules_cc//cc/private/toolchain:generate_system_module_map.sh",
         "@rules_sycl//sycl:sycl_toolchain_config.bzl",
     ])
@@ -507,6 +539,7 @@ def sycl_autoconf_impl(repository_ctx):
     ))
 
     sycl_libs = _find_libs(repository_ctx, sycl_config, bash_bin)
+    print("CEMLYN: ", sycl_libs)
     sycl_lib_srcs = []
     sycl_lib_outs = []
     for lib in sycl_libs.values():
@@ -518,6 +551,50 @@ def sycl_autoconf_impl(repository_ctx):
         srcs = sycl_lib_srcs,
         outs = sycl_lib_outs,
     ))
+
+    if sycl_config.sycl_basekit_version_number < "2024":
+        mkl_sycl_libs = '"{}"'.format(
+            "sycl/lib/" + sycl_libs["mkl_sycl"].file_name,
+        )
+    else:
+        mkl_sycl_libs = '"{}",\n"{}",\n"{}",\n"{}",\n"{}",\n"{}",\n"{}",\n"{}"'.format(
+            "sycl/lib/" + sycl_libs["mkl_sycl_blas"].file_name,
+            "sycl/lib/" + sycl_libs["mkl_sycl_lapack"].file_name,
+            "sycl/lib/" + sycl_libs["mkl_sycl_sparse"].file_name,
+            "sycl/lib/" + sycl_libs["mkl_sycl_dft"].file_name,
+            "sycl/lib/" + sycl_libs["mkl_sycl_vm"].file_name,
+            "sycl/lib/" + sycl_libs["mkl_sycl_rng"].file_name,
+            "sycl/lib/" + sycl_libs["mkl_sycl_stats"].file_name,
+            "sycl/lib/" + sycl_libs["mkl_sycl_data_fitting"].file_name,
+        )
+    core_sycl_libs = to_list_of_strings([
+        "sycl/lib/" + sycl_libs["sycl"].file_name,  # .split(".so")[0],
+        "sycl/lib/" + sycl_libs["OpenCL"].file_name,  # .split(".so")[0],
+        "sycl/lib/" + sycl_libs["svml"].file_name,  # .split(".so")[0],
+        "sycl/lib/" + sycl_libs["irng"].file_name,  # .split(".so")[0],
+        "sycl/lib/" + sycl_libs["imf"].file_name,  # .split(".so")[0],
+        "sycl/lib/" + sycl_libs["intlc"].file_name,  # .split(".so")[0],
+        "sycl/lib/" + sycl_libs["umf"].file_name,  # .split(".so")[0],
+        "sycl/lib/" + sycl_libs["hwloc"].file_name,  # .split(".so")[0],
+        "sycl/lib/" + sycl_libs["ur_loader"].file_name,  # .split(".so")[0],
+        "sycl/lib/" + sycl_libs["ur_adapter_opencl"].file_name,  # .split(".so")[0],
+    ])
+    repository_dict = {
+        "%{mkl_intel_ilp64_lib}": sycl_libs["mkl_intel_ilp64"].file_name,
+        "%{mkl_sequential_lib}": sycl_libs["mkl_sequential"].file_name,
+        "%{mkl_core_lib}": sycl_libs["mkl_core"].file_name,
+        "%{mkl_sycl_libs}": mkl_sycl_libs,
+        "%{core_sycl_libs}": core_sycl_libs,
+        "%{copy_rules}": "\n".join(copy_rules),
+        "%{sycl_headers}": ('":mkl-include",\n":sycl-include",\n'),
+    }
+
+    # TODO: I don't like double folder sycl/sycl!
+    repository_ctx.template(
+        "sycl/BUILD",
+        paths["@rules_sycl//sycl/sycl:BUILD.tpl"],
+        repository_dict,
+    )
 
     cc = find_cc(repository_ctx)
     host_compiler_includes = get_cxx_inc_directories(repository_ctx, cc)
@@ -672,7 +749,7 @@ def sycl_autoconf_impl(repository_ctx):
             "%{unfiltered_compile_flags}": to_list_of_strings([
                 "-DTENSORFLOW_USE_SYCL=1",
                 "-DMKL_ILP64",
-                "-fPIC",
+                # "-fPIC",
             ]),
             "%{linker_bin_path}": escape_string("/usr/bin"),
             # "%{builtin_sysroot}": "",
