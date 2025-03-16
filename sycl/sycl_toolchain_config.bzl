@@ -72,14 +72,19 @@ def _impl(ctx):
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
         action_configs = action_configs,
-        cxx_builtin_include_directories = [
-            "/usr/include",
-            "/usr/lib/gcc/x86_64-linux-gnu/14/include",
-            "/opt/intel/oneapi/mkl/2025.0/include",
-            "/opt/intel/oneapi/compiler/2025.0/include",
-            "/opt/intel/oneapi/compiler/2025.0/include/sycl",
-            "/opt/intel/oneapi/compiler/2025.0/lib/clang/19/include",
-        ],
+        # TODO: The next steps is to use a repository rule in a repository rule
+        #  to automatically get these include directories and inject them here.
+        #  We can get inspiration on how to do this from TensorFlow.
+        #  We also want to add them as -isystem flags so that intellisense can detect them.
+        cxx_builtin_include_directories = ctx.attr.cxx_builtin_include_directories,
+        # cxx_builtin_include_directories = [
+        #     "/usr/include",
+        #     "/usr/lib/gcc/x86_64-linux-gnu/14/include",
+        #     "/opt/intel/oneapi/mkl/2025.0/include",
+        #     "/opt/intel/oneapi/compiler/2025.0/include",
+        #     "/opt/intel/oneapi/compiler/2025.0/include/sycl",
+        #     "/opt/intel/oneapi/compiler/2025.0/lib/clang/19/include",
+        # ],
         toolchain_identifier = ctx.attr.toolchain_identifier,
         # host_system_name = "local",
         # target_system_name = "local",
@@ -95,6 +100,7 @@ sycl_toolchain_config = rule(
     implementation = _impl,
     attrs = {
         "toolchain_identifier": attr.string(mandatory = True),
+        "cxx_builtin_include_directories": attr.string_list(mandatory = True),
     },
     provides = [CcToolchainConfigInfo],
 )

@@ -1,5 +1,23 @@
 """ IDK """
 
+load(
+    "//sycl:common.bzl",
+    "err_out",
+    "files_exist",
+    "get_host_environ",
+    "raw_exec",
+    "which",
+)
+
+_GCC_HOST_COMPILER_PATH = "GCC_HOST_COMPILER_PATH"
+_INC_DIR_MARKER_BEGIN = "#include <...>"
+
+def auto_configure_fail(msg):
+    """Output failure message when auto configuration fails."""
+    red = "\033[0;31m"
+    no_color = "\033[0m"
+    fail("\n%sAuto-Configuration Error:%s %s\n" % (red, no_color, msg))
+
 def resolve_labels(repository_ctx, labels):
     """Resolves a collection of labels to their paths.
 
@@ -60,6 +78,179 @@ def get_cpu_value(repository_ctx):
         return "aarch64"
     return "k8" if arch in ["amd64", "x86_64", "x64"] else "piii"
 
+def to_list_of_strings(elements):
+    """Convert the list of ["a", "b", "c"] into '"a", "b", "c"'.
+
+    This is to be used to put a list of strings into the bzl file templates
+    so it gets interpreted as list of strings in Starlark.
+
+    Args:
+      elements: list of string elements
+
+    Returns:
+      single string of elements wrapped in quotes separated by a comma."""
+    quoted_strings = ["\"" + element + "\"" for element in elements]
+    return ", ".join(quoted_strings)
+
+def _cxx_inc_convert(path):
+    """Convert path returned by cc -E xc++ in a complete path."""
+    path = path.strip()
+    return path
+
+def _get_cxx_inc_directories_impl(repository_ctx, cc, lang_is_cpp):
+    """Compute the list of default C or C++ include directories."""
+    if lang_is_cpp:
+        lang = "c++"
+    else:
+        lang = "c"
+
+    result = raw_exec(repository_ctx, [
+        cc,
+        "-no-canonical-prefixes",
+        "-E",
+        "-x" + lang,
+        "-",
+        "-v",
+    ])
+    stderr = err_out(result)
+    index1 = stderr.find(_INC_DIR_MARKER_BEGIN)
+    if index1 == -1:
+        return []
+    index1 = stderr.find("\n", index1)
+    if index1 == -1:
+        return []
+    index2 = stderr.rfind("\n ")
+    if index2 == -1 or index2 < index1:
+        return []
+    index2 = stderr.find("\n", index2 + 1)
+    if index2 == -1:
+        inc_dirs = stderr[index1 + 1:]
+    else:
+        inc_dirs = stderr[index1 + 1:index2].strip()
+
+    return [
+        str(repository_ctx.path(_cxx_inc_convert(p)))
+        for p in inc_dirs.split("\n")
+    ]
+
+def get_cxx_inc_directories(repository_ctx, cc):
+    """Compute the list of default C and C++ include directories.
+
+    Args:
+      repository_ctx: The repository context.
+      cc: The path to the C++ compiler.
+
+    Returns:
+      A list of default C and C++ include directories.
+    """
+
+    # For some reason `clang -xc` sometimes returns include paths that are
+    # different from the ones from `clang -xc++`. (Symlink and a dir)
+    # So we run the compiler with both `-xc` and `-xc++` and merge resulting lists
+    includes_cpp = _get_cxx_inc_directories_impl(repository_ctx, cc, True)
+    includes_c = _get_cxx_inc_directories_impl(repository_ctx, cc, False)
+
+    includes_cpp_set = depset(includes_cpp)
+    return includes_cpp + [
+        inc
+        for inc in includes_c
+        if inc not in includes_cpp_set.to_list()
+    ]
+
+def _mkl_path(sycl_config):
+    return sycl_config.sycl_basekit_path + "/mkl/" + sycl_config.sycl_basekit_version_number
+
+def _sycl_header_path(repository_ctx, sycl_config, bash_bin):
+    sycl_header_path = sycl_config.sycl_basekit_path + "/compiler/" + sycl_config.sycl_basekit_version_number
+    include_dir = sycl_header_path + "/include"
+    if not files_exist(repository_ctx, [include_dir], bash_bin)[0]:
+        sycl_header_path = sycl_header_path + "/linux"
+        include_dir = sycl_header_path + "/include"
+        if not files_exist(repository_ctx, [include_dir], bash_bin)[0]:
+            auto_configure_fail("Cannot find sycl headers in {}".format(include_dir))
+    return sycl_header_path
+
+def _sycl_include_path(repository_ctx, sycl_config, bash_bin):
+    """Generates cxx_builtin_include_directory entries for sycl include directories.
+
+    Args:
+      repository_ctx: The repository context.
+      sycl_config: The sycl config struct.
+      bash_bin: The path to the bash binary.
+    Returns:
+      A list of include directories.
+    """
+    inc_dirs = []
+
+    inc_dirs.append(_mkl_path(sycl_config) + "/include")
+    inc_dirs.append(_sycl_header_path(repository_ctx, sycl_config, bash_bin) + "/include")
+    inc_dirs.append(_sycl_header_path(repository_ctx, sycl_config, bash_bin) + "/include/sycl")
+
+    return inc_dirs
+
+def find_cc(repository_ctx):
+    """Find the C++ compiler.
+
+    Args:
+      repository_ctx: The repository context.
+
+    Returns:
+      The path to the C++ compiler.
+    """
+
+    # Return a dummy value for GCC detection here to avoid error
+    target_cc_name = "gcc"
+    cc_path_envvar = _GCC_HOST_COMPILER_PATH
+    cc_name = target_cc_name
+
+    cc_name_from_env = get_host_environ(repository_ctx, cc_path_envvar)
+    if cc_name_from_env:
+        cc_name = cc_name_from_env
+    if cc_name.startswith("/"):
+        # Absolute path, maybe we should make this supported by our which function.
+        return cc_name
+    cc = which(repository_ctx, cc_name)
+    if cc == None:
+        fail(("Cannot find {}, either correct your path or set the {}" +
+              " environment variable").format(target_cc_name, cc_path_envvar))
+    return cc
+
+def find_sycl_root(repository_ctx, sycl_config):
+    sycl_name = str(repository_ctx.path(sycl_config.sycl_toolkit_path.strip()).realpath)
+    if sycl_name.startswith("/"):
+        return sycl_name
+    fail("Cannot find SYCL compiler, please correct your path")
+
+def find_sycl_include_path(repository_ctx, sycl_config):
+    """Find the include paths for the SYCL compiler.
+
+    Args:
+      repository_ctx: The repository context.
+      sycl_config: The sycl config struct.
+
+    Returns:
+      A list of include directories.
+    """
+    base_path = find_sycl_root(repository_ctx, sycl_config)
+    bin_path = repository_ctx.path(base_path + "/" + "bin" + "/" + "icpx")
+    icpx_extra = ""
+    if not bin_path.exists:
+        bin_path = repository_ctx.path(base_path + "/" + "bin" + "/" + "clang")
+        if not bin_path.exists:
+            fail("Cannot find SYCL compiler, please correct your path")
+    else:
+        icpx_extra = "-fsycl"
+    gcc_path = repository_ctx.which("gcc")
+    gcc_install_dir = repository_ctx.execute([gcc_path, "-print-libgcc-file-name"])
+    gcc_install_dir_opt = "--gcc-install-dir=" + str(repository_ctx.path(gcc_install_dir.stdout.strip()).dirname)
+    cmd_out = repository_ctx.execute([bin_path, icpx_extra, gcc_install_dir_opt, "-xc++", "-E", "-v", "/dev/null", "-o", "/dev/null"])
+    outlist = cmd_out.stderr.split("\n")
+    include_dirs = []
+    for l in outlist:
+        if l.startswith(" ") and l.strip().startswith("/") and str(repository_ctx.path(l.strip()).realpath) not in include_dirs:
+            include_dirs.append(str(repository_ctx.path(l.strip()).realpath))
+    return include_dirs
+
 def sycl_autoconf_toolchains_impl(repository_ctx):
     """Generate BUILD file with 'toolchain' targets for the local host C++ toolchain.
 
@@ -99,15 +290,20 @@ def sycl_autoconf_impl(repository_ctx):
         "sycl_toolchain_config.bzl",
     )
 
-    # auto_configure_warning_maybe(repository_ctx, "CC used: " + str(cc))
-    # tool_paths = _get_tool_paths(repository_ctx, overridden_tools)
+    # TODO: Don't hard code?
+    bash_bin = "/usr/bin/bash"
+    sycl_config = struct(
+        sycl_basekit_path = "/opt/intel/oneapi",
+        sycl_basekit_version_number = "2025.0",
+        sycl_toolkit_path = "/opt/intel/oneapi/compiler/2025.0",
+        sycl_version_number = "80000",
+    )
 
-    # cc_toolchain_identifier = escape_string(get_env_var(
-    #     repository_ctx,
-    #     "CC_TOOLCHAIN_NAME",
-    #     "local",
-    #     False,
-    # ))
+    cc = find_cc(repository_ctx)
+    host_compiler_includes = get_cxx_inc_directories(repository_ctx, cc)
+    sycl_internal_inc_dirs = find_sycl_include_path(repository_ctx = repository_ctx, sycl_config = sycl_config)
+    cxx_builtin_includes_list = sycl_internal_inc_dirs + _sycl_include_path(repository_ctx, sycl_config, bash_bin) + host_compiler_includes
+
     sycl_toolchain_identifier = "local"
     repository_ctx.template(
         "BUILD",
@@ -144,7 +340,7 @@ def sycl_autoconf_impl(repository_ctx):
             # "%{conly_flags}": get_starlark_list(conly_opts),
             # "%{coverage_compile_flags}": coverage_compile_flags,
             # "%{coverage_link_flags}": coverage_link_flags,
-            # "%{cxx_builtin_include_directories}": get_starlark_list(builtin_include_directories),
+            "%{cxx_builtin_include_directories}": to_list_of_strings(cxx_builtin_includes_list),
             # "%{cxx_flags}": get_starlark_list(cxx_opts + _escaped_cplus_include_paths(repository_ctx)),
             # "%{dbg_compile_flags}": get_starlark_list(["-g"]),
             # "%{extra_flags_per_feature}": repr(extra_flags_per_feature),

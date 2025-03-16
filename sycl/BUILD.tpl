@@ -50,7 +50,7 @@ sycl_toolchain_config(
     # target_libc = "%{target_libc}",
     # abi_version = "%{abi_version}",
     # abi_libc_version = "%{abi_libc_version}",
-    # cxx_builtin_include_directories = [%{cxx_builtin_include_directories}],
+    cxx_builtin_include_directories = [%{cxx_builtin_include_directories}],
     # tool_paths = {%{tool_paths}},
     # compile_flags = [%{compile_flags}],
     # opt_compile_flags = [%{opt_compile_flags}],
