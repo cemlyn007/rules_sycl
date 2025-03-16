@@ -4,11 +4,9 @@ cc_binary(
     cxxopts = [
         "-fsycl",
         "-fsycl-targets=nvptx64-nvidia-cuda",
-        "--offload-arch=sm_80",
     ],
     data = [
         ":data.txt",
-        # "@sycl//:hello.txt",
     ],
     linkopts = [
         "-fsycl",
