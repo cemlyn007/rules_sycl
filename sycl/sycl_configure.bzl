@@ -97,7 +97,7 @@ def make_copy_files_rule(name, srcs, outs):
 %s
     ],
     cmd = \"""%s \""",
-)""" % (name, "\n".join(outs), " && \\\n".join(cmds))
+)""" % (name, "\n".join(outs), " && \\\n             ".join(cmds))
 
 def make_copy_dir_rule(repository_ctx, name, src_dir, out_dir, exceptions = None):
     """Returns a rule to recursively copy a directory.
@@ -214,8 +214,8 @@ def to_list_of_strings(elements):
 
     Returns:
       single string of elements wrapped in quotes separated by a comma."""
-    quoted_strings = ["\"" + element + "\"" for element in elements]
-    return ", ".join(quoted_strings)
+    quoted_strings = ["\"" + element + "\"," for element in sorted(elements)]
+    return "\n        ".join(quoted_strings)
 
 def _cxx_inc_convert(path):
     """Convert path returned by cc -E xc++ in a complete path."""

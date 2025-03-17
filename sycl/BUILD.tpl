@@ -32,8 +32,12 @@ sycl_toolchain_config(
     target_libc = "%{target_libc}",
     abi_version = "%{abi_version}",
     abi_libc_version = "%{abi_libc_version}",
-    cxx_builtin_include_directories = [%{cxx_builtin_include_directories}],
-    extra_no_canonical_prefixes_flags = [%{extra_no_canonical_prefixes_flags}],
+    cxx_builtin_include_directories = [
+        %{cxx_builtin_include_directories}
+    ],
+    extra_no_canonical_prefixes_flags = [
+        %{extra_no_canonical_prefixes_flags}
+    ],
     host_c_compiler_path = "%{host_c_compiler_path}",
     host_cc_compiler_path = "%{host_cc_compiler_path}",
     host_compiler_prefix = "%{host_compiler_prefix}",
