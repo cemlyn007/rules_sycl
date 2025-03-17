@@ -1,4 +1,5 @@
 #include <exception>
+#include <iostream>
 #include <sycl/sycl.hpp>
 
 int main(int argc, char *argv[]) {

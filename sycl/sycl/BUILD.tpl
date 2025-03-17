@@ -8,22 +8,12 @@ config_setting(
 )
 
 cc_library(
-    name = "sycl_headers",
-    hdrs = [
-        %{sycl_headers}
-    ],
-    includes = [
-        ".",
-        "sycl/include",
-        "sycl/include/sycl",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-cc_library(
     name = "sycl",
     srcs = [
         %{core_sycl_libs}
+    ],
+    hdrs = [
+        %{sycl_headers}
     ],
     data = [
         %{core_sycl_libs}
@@ -31,6 +21,7 @@ cc_library(
     includes = [
         ".",
         "sycl/include",
+        "sycl/include/sycl",
     ],
     linkstatic = 1,
     visibility = ["//visibility:public"],

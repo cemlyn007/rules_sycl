@@ -19,7 +19,9 @@ cc_binary(
     srcs = ["example.cpp"],
     cxxopts = CORE_FLAGS + CPU_FLAGS,
     linkopts = CORE_FLAGS + CPU_FLAGS,
-    deps = ["@local_config_sycl//sycl"],
+    deps = [
+        "@local_config_sycl//sycl",
+    ],
 )
 
 cc_binary(

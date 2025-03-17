@@ -55,6 +55,7 @@ def all_cpp_compile_actions():
 
 def all_preprocessed_actions():
     return [
+        ACTION_NAMES.c_compile,
         ACTION_NAMES.cpp_compile,
         ACTION_NAMES.cpp_header_parsing,
         ACTION_NAMES.cpp_module_codegen,
@@ -184,11 +185,6 @@ def _no_canonical_prefixes_group(extra_flags):
 
 def _features(cpu, compiler, ctx):
     if cpu == "k8":
-        isystem_flags = []
-        for cxx_builtin_include_directory in ctx.attr.cxx_builtin_include_directories:
-            isystem_flags.append("-isystem")
-            isystem_flags.append(cxx_builtin_include_directory)
-
         return [
             feature(name = "no_legacy_features"),
             feature(
@@ -234,9 +230,6 @@ def _features(cpu, compiler, ctx):
                             _iterate_flag_group(
                                 flags = ["-isystem", "%{system_include_paths}"],
                                 iterate_over = "system_include_paths",
-                            ),
-                            flag_group(
-                                flags = isystem_flags,
                             ),
                             _iterate_flag_group(
                                 flags = ["-F", "%{framework_include_paths}"],

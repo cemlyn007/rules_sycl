@@ -583,7 +583,7 @@ def sycl_autoconf_impl(repository_ctx):
         "%{mkl_sycl_libs}": mkl_sycl_libs,
         "%{core_sycl_libs}": core_sycl_libs,
         "%{copy_rules}": "\n".join(copy_rules),
-        "%{sycl_headers}": ('":mkl-include",\n":sycl-include",\n'),
+        "%{sycl_headers}": to_list_of_strings([":mkl-include", ":sycl-include"]),
     }
 
     # TODO: I don't like double folder sycl/sycl!
