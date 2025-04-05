@@ -27,12 +27,9 @@ Feel free to try `ONEAPI_DEVICE_SELECTOR="opencl:cpu"` instead, it did work for 
 ## Disclaimer
 1. Code has heavily been inspired and copied from TensorFlow and cc_rules, I take no credit for the authors who contributed to those Git repositories, and thank them very much!
 2. This is the classic it works on my machine, but I hope it works on yours as well! There are few things I have not ironned out,
-
-    a. I doubt I have configured this to offload to the CPU.
     
-    b. I have only tested this on Bazel 8.1.1 with an NVIDIA GPU with CUDA 12.8 on Ubuntu Linux x64_86.
+    a. I have only tested this on Bazel 8.1.1 with an NVIDIA GPU with CUDA 12.8 on Ubuntu Linux x64_86.
 
-    c. I currently have hardcoded the location of Intel OneAPI and the version to 2025.0.
+    b. I currently have hardcoded the location of Intel OneAPI and the version to 2025.0.
 
-    d. Whilst intellisense is detecting all the files nicely, I am getting a couple of intellisense errors in the example script... :'(
 3. I am a Bazel noob, so if anyone notices anything obviously non-sensical, then please make a PR / contact me and we can address it.
